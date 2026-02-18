@@ -8,8 +8,10 @@ const userSchema = new moongose.Schema({
     
 const taskSchema = new moongose.Schema({
     title: String,
-    status: {type:String, enum: ['pending', 'completed'], default: 'pending'},
-    assignedTo: { type: moongose.Schema.Types.ObjectId, ref: 'User' }
+    status: {type:Boolean, enum: [true, false], default: false},
+    assignees: [{ type: Schema.Types.ObjectId, ref: 'User' }], // có thể có nhiều người được giao nhiệm vụ, nên dùng mảng
+    assignedBy: { type: moongose.Schema.Types.ObjectId, ref: 'User' },
+    createAt: { type: Date, default: Date.now }
 });
 
 const User = mongoose.model('User', userSchema);
