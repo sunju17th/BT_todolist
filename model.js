@@ -1,16 +1,16 @@
-const moongose =  require('moongose');
+const mongoose =  require('mongoose');
 
-const userSchema = new moongose.Schema({
-    name: String,
+const userSchema = new mongoose.Schema({
+    name: {type : String, required: true, unique: true},
     password: String,
-    role: { type: String, enum: ['admin', 'user'] }
+    role: { type: String, enum: ['admin', 'normal'], default : 'normal' }
 });
     
-const taskSchema = new moongose.Schema({
+const taskSchema = new mongoose.Schema({
     title: String,
     status: {type:Boolean, enum: [true, false], default: false},
-    assignees: [{ type: Schema.Types.ObjectId, ref: 'User' }], // có thể có nhiều người được giao nhiệm vụ, nên dùng mảng
-    assignedBy: { type: moongose.Schema.Types.ObjectId, ref: 'User' },
+    assignees: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // có thể có nhiều người được giao nhiệm vụ, nên dùng mảng
+    assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createAt: { type: Date, default: Date.now }
 });
 
