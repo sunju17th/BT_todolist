@@ -3,6 +3,8 @@ require('dotenv').config();
 const mongoose = require('mongoose'); 
 const express = require('express');
 const { User, Task } = require('./model');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -12,13 +14,83 @@ mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('Connected to MongoDB'))
     .catch((err) => console.error('Could not connect to MongoDB...', err));
 
-// 1. API lấy tất cả task, sắp xếp theo thời gian tạo mới nhất và hiển thị tên người được giao và người giao
+const authenticateToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (!token) return res.status(401).send({ err: 'Access token is missing' });
+
+    try {
+        const decode = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = decode;
+        next();
+    }
+    catch (err) {
+        res.status(403).send({ err: 'Invalid access token' });
+    }
+};
+
+// API dăng ký user mới 
+app.post('/api/register', async (req, res) => {
+    try {
+        const { username, fullname, password, role } = req.body;
+
+        const existingUser = await User.findOne({ username });
+        if (existingUser) {
+            return res.status(400).send({ err: 'Username already exists' });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const newUser = new User({
+            username,
+            fullname,
+            password: hashedPassword,
+            role: role || 'normal'
+        })
+        await newUser.save();
+        res.status(201).json({ message: 'User registered successfully' });
+    }
+    catch (err) {
+        res.status(500).send({ err: err.message });
+    }
+});
+
+// API đăng nhập và trả về token
+app.post('/api/login', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const user = await User.findOne({ username });
+        if (!user) {
+            return res.status(400).send({ err: 'Invalid username or password' });
+        }
+
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            return res.status(400).send({ err: 'Invalid username or password' });
+        }
+
+        const token = jwt.sign(
+            { userId: user._id, role: user.role },
+            process.env.JWT_SECRET,
+            { expiresIn: '1d' }
+        );
+
+        res.status(200).json({
+            message: 'Login successful', 
+            token : token
+         });
+    }
+    catch (err) {
+        res.status(500).send({ err: err.message });
+    }
+});
+
+// API lấy tất cả task, sắp xếp theo thời gian tạo mới nhất và hiển thị tên người được giao và người giao
 app.get('/api/tasks', async (req, res) => {
     try {
         const tasks = await Task.find({}) 
             .sort({ createdAt: -1 }) 
-            .populate('assignees', 'name')
-            .populate('assignedBy', 'name');
+            .populate('assignees', 'username')
+            .populate('assignedBy', 'username');
             
         res.json(tasks); 
     }
@@ -27,19 +99,18 @@ app.get('/api/tasks', async (req, res) => {
     }
 });
 
-// 2. API tạo task mới cho user
-app.post('/api/tasks', async (req, res) => { 
+// API tạo task mới cho user
+app.post('/api/tasks', authenticateToken, async (req, res) => { 
     try {
-        const { title, assignees, assignedBy } = req.body;
-        
-        const creator = await User.findById(assignedBy);
-        if(!creator) {
-            return res.status(400).send({ err: 'User assignedBy not found' });
-        }
+        const { title, assignees } = req.body;
+
+        const creatorId = req.user.id;
+        const creatorRole = req.user.role;
+
 
         let assigneesArr = [];
 
-        if (creator.role === 'admin') {
+        if (creatorRole === 'admin') {
             if (!assignees || assignees.length === 0) {
                 return res.status(400).send({ err: 'Admin must assign the task to at least one user' });
             }
@@ -57,26 +128,35 @@ app.post('/api/tasks', async (req, res) => {
             assigneesArr = assignees;
         } else {
             if (assignees && assignees.length > 0) {
-                if (assignees.length > 1 || assignees[0] !== assignedBy) {
+                if (assignees.length > 1 || assignees[0] !== creatorId) {
                     return res.status(400).send({ err: 'Normal user can only assign the task to themselves' });
                 } else {
-                    assigneesArr = [assignedBy];
+                    assigneesArr = [creatorId];
                 }
             } 
         }
+        
+        const newTask = new Task({
+            title,
+            assignees: assigneesArr,
+            assignedBy : creatorId
+        });
+
+        await newTask.save();
+        res.status(201).json({newTask});
     }
     catch (err) {
         res.status(500).send({ err: err.message });
     }
 });
 
-// 3. API lấy tất cả task của một user, sắp xếp theo thời gian tạo mới nhất và hiển thị tên người được giao và người giao
+// API lấy tất cả task của một user, sắp xếp theo thời gian tạo mới nhất và hiển thị tên người được giao và người giao
 app.get('/api/tasks/user/:userId', async (req, res) => {
     try {
         const tasks = await Task.find({ assignees: req.params.userId })
             .sort({ createdAt: -1 })
-            .populate('assignees', 'name')
-            .populate('assignedBy', 'name');
+            .populate('assignees', 'username')
+            .populate('assignedBy', 'username');
             
         res.json(tasks);
     } catch (err) {
