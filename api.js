@@ -10,6 +10,12 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 app.use(express.json());
 
+const cookieParser = require('cookie-parser');
+app.use(cookieParser()); // Cho phép Express đọc Cookie từ trình duyệt
+
+app.set('view engine', 'ejs');
+app.use(express.urlencoded({ extended: true }));
+
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('Connected to MongoDB'))
     .catch((err) => console.error('Could not connect to MongoDB...', err));
@@ -275,6 +281,49 @@ app.get('/api/tasks/nguyen', async (req, res) => {
         res.json(tasks);
     } catch (err) {
         res.status(500).send({ err: err.message });
+    }
+});
+
+// ==========================================
+// ROUTES GIAO DIỆN WEB (LEVEL 2)
+// ==========================================
+
+// 1. HIỂN THỊ TRANG CHỦ
+app.get('/', async (req, res) => {
+    try {
+        // Lấy tất cả task từ DB (có kèm thông tin tiến độ)
+        const tasks = await Task.find({}).sort({ createdAt: -1 });
+        
+        // Trộn dữ liệu vào file 'index.ejs' và gửi cho trình duyệt
+        res.render('index', { tasks: tasks }); 
+    } catch (err) {
+        res.status(500).send("Lỗi tải trang web!");
+    }
+});
+
+// 2. XỬ LÝ NÚT "THÊM CÔNG VIỆC"
+app.post('/web/add-task', async (req, res) => {
+    try {
+        const title = req.body.title; // Lấy chữ người dùng gõ vào ô input (name="title")
+        
+        // Tạo task tạm thời (chưa cần gán user để test giao diện trước)
+        const newTask = new Task({ title: title });
+        await newTask.save();
+
+        // Thêm xong thì bắt trình duyệt tự động load lại trang chủ
+        res.redirect('/'); 
+    } catch (err) {
+        res.status(500).send("Lỗi thêm task!");
+    }
+});
+
+// 3. XỬ LÝ NÚT "XÓA"
+app.post('/web/delete-task/:id', async (req, res) => {
+    try {
+        await Task.findByIdAndDelete(req.params.id);
+        res.redirect('/'); // Xóa xong cũng load lại trang
+    } catch (err) {
+        res.status(500).send("Lỗi xóa task!");
     }
 });
 

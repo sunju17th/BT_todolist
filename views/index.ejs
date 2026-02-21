@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Todo List Của Tôi</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container mt-5" style="max-width: 700px;">
+    <h2 class="text-center mb-4 text-primary">Quản Lý Công Việc (Level 2)</h2>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form action="/web/add-task" method="POST" class="d-flex">
+                <input type="text" name="title" class="form-control me-2" placeholder="Nhập tên công việc mới..." required>
+                <button type="submit" class="btn btn-primary">Thêm</button>
+            </form>
+        </div>
+    </div>
+
+    <ul class="list-group shadow-sm">
+        
+        <% tasks.forEach(function(task) { %>
+            
+            <li class="list-group-item mb-2 rounded border">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="mb-0 fw-bold"><%= task.title %></h5>
+                    
+                    <form action="/web/delete-task/<%= task._id %>" method="POST" style="margin: 0;">
+                        <button type="submit" class="btn btn-danger btn-sm">Xóa</button>
+                    </form>
+                </div>
+
+                <% 
+                    // Mặc định là 0%
+                    let phanTram = 0; 
+                    
+                    // Nếu status tổng là true -> 100%
+                    if (task.status === true) {
+                        phanTram = 100;
+                    } 
+                    // Tính phần trăm dựa trên mảng progress (Level 3)
+                    else if (task.progress && task.progress.length > 0) {
+                        let soNguoiXong = task.progress.filter(p => p.isDone === true).length;
+                        phanTram = Math.round((soNguoiXong / task.progress.length) * 100);
+                    }
+
+                    // Đổi màu thanh tiến độ: 100% màu xanh (success), chưa xong màu vàng (warning)
+                    let mauSac = (phanTram === 100) ? "bg-success" : "bg-warning";
+                %>
+
+                <div class="progress" style="height: 20px;">
+                    <div class="progress-bar <%= mauSac %> progress-bar-striped progress-bar-animated" 
+                         role="progressbar" 
+                         style="width: <%= phanTram %>%;" 
+                         aria-valuenow="<%= phanTram %>" aria-valuemin="0" aria-valuemax="100">
+                        <%= phanTram %>%
+                    </div>
+                </div>
+            </li>
+
+        <% }) %>
+    </ul>
+</div>
+
+</body>
+</html>
