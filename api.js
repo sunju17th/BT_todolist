@@ -104,7 +104,7 @@ app.post('/api/tasks', authenticateToken, async (req, res) => {
     try {
         const { title, assignees } = req.body;
 
-        const creatorId = req.user.id;
+        const creatorId = req.user.userId;
         const creatorRole = req.user.role;
 
 
@@ -268,7 +268,7 @@ app.get('/api/tasks/nguyen', async (req, res) => {
         const tasks = await Task.find({})
             .populate({
                 path: 'assignees',
-                match: { username: { $regex: '^Nguyễn' } }
+                match: { fullname: { $regex: '^Nguyễn' } }
             })
             .populate('assignedBy', 'username');
 
