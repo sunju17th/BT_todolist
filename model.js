@@ -12,6 +12,10 @@ const taskSchema = new mongoose.Schema({
     status: {type:Boolean, enum: [true, false], default: false},
     assignees: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // có thể có nhiều người được giao nhiệm vụ, nên dùng mảng
     assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    progress : [{
+        userId : {type : mongoose.Schema.Types.ObjectId, ref: 'User'},
+        isDone : {type : Boolean, default : false}
+    }],
     createAt: { type: Date, default: Date.now }
 });
 
