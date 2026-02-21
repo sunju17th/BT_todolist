@@ -239,6 +239,45 @@ app.put('/api/tasks/:taskId/status', authenticateToken, async (req, res) => {
     }
 });
 
+//API xóa task, admin có thể xóa tất cả task, user thường chỉ có thể xóa task do mình tạo ra
+app.delete('/api/tasks/:taskId', authenticateToken, async (req, res) => {
+    try {
+        const taskId = req.params.taskId;
+        const userId = req.user.id;
+        const userRole = req.user.role;
+        const task = await Task.findById(taskId);
+
+        if (!task) {
+            return res.status(404).send({ err: 'Task not found' });
+        }
+
+        if (userRole === 'admin' || task.assignedBy.toString() === userId) {
+            await Task.findByIdAndDelete(taskId);
+            res.json({ message: 'Task deleted successfully' });
+        } else {
+            res.status(403).send({ err: 'You do not have permission to delete this task' });
+        }
+    } catch (err) {
+        res.status(500).send({ err: err.message });
+    }
+});
+
+// API xuất các task với user họ Nguyễn
+app.get('/api/tasks/nguyen', async (req, res) => {
+    try {
+        const tasks = await Task.find({})
+            .populate({
+                path: 'assignees',
+                match: { username: { $regex: '^Nguyễn' } }
+            })
+            .populate('assignedBy', 'username');
+
+        res.json(tasks);
+    } catch (err) {
+        res.status(500).send({ err: err.message });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Server is running at http://localhost:${PORT}`);
 });
