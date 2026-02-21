@@ -135,11 +135,15 @@ app.post('/api/tasks', authenticateToken, async (req, res) => {
                 }
             } 
         }
-        
+        const progressArr = assigneesArr.map(id => {
+            return { userId: id, isDone: false };
+        });
+            
         const newTask = new Task({
             title,
             assignees: assigneesArr,
-            assignedBy : creatorId
+            assignedBy : creatorId,
+            progress: progressArr
         });
 
         await newTask.save();
@@ -159,6 +163,77 @@ app.get('/api/tasks/user/:userId', async (req, res) => {
             .populate('assignedBy', 'username');
             
         res.json(tasks);
+    } catch (err) {
+        res.status(500).send({ err: err.message });
+    }
+});
+
+// API lấy task trong ngày hiện tại của một user
+app.get('/api/tasks/user/:userId/today', async (req, res) => {
+    try {
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const endOfDay = new Date(startOfDay);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        const tasks = await Task.find({
+            assignees: req.params.userId,
+            createdAt: { $gte: startOfDay, $lte: endOfDay }
+        })
+        .sort({ createdAt: -1 })
+        .populate('assignees', 'username')
+        .populate('assignedBy', 'username');
+
+        res.json(tasks);
+    } catch (err) {
+        res.status(500).send({ err: err.message });
+    }
+});
+
+// API lấy task chưa hoàn thành của một user
+app.get('/api/tasks/user/:userId/incomplete', async (req, res) => {
+    try {
+        const tasks = await Task.find({
+            assignees: req.params.userId,
+            status: false
+        })
+        .sort({ createdAt: -1 })
+        .populate('assignees', 'username')
+        .populate('assignedBy', 'username');
+        
+        res.json(tasks);
+    } catch (err) {
+        res.status(500).send({ err: err.message });
+    }
+});
+
+// API cập nhật trạng thái hoàn thành của task
+app.put('/api/tasks/:taskId/status', authenticateToken, async (req, res) => {
+    try {
+        const taskId  = req.params.taskId;
+        const userId = req.user.id;
+        const task = await Task.findById(taskId);
+        if (!task) {
+            return res.status(404).send({ err: 'Task not found' });
+        }
+
+        const userProgress = task.progress.find(p => p.userId.toString() === userId);
+
+        if (!userProgress) {
+            return res.status(403).send({ err: 'You are not assigned to this task' });
+        }
+
+        userProgress.isDone = true;
+
+        const allDone = task.progress.every(p => p.isDone === true);
+
+        if (allDone) {
+            task.status = true;
+        }
+
+        await task.save();
+        res.json({ message: 'Task status updated successfully', task });
     } catch (err) {
         res.status(500).send({ err: err.message });
     }
